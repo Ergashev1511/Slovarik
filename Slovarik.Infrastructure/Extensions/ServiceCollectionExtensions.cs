@@ -42,14 +42,18 @@ public static class ServiceCollectionExtensions
         // Quiz settings
         services.Configure<QuizSettings>(config.GetSection("Quiz"));
 
-        // Telegram bot
+        // Telegram bot (faqat token sozlangan bo'lsa)
         services.Configure<TelegramBotSettings>(config.GetSection("Telegram"));
-        services.AddSingleton<ITelegramBotClient>(sp =>
+        var botToken = config.GetValue<string>("Telegram:BotToken");
+        if (!string.IsNullOrWhiteSpace(botToken))
         {
-            var settings = sp.GetRequiredService<IOptions<TelegramBotSettings>>().Value;
-            return new TelegramBotClient(settings.BotToken);
-        });
-        services.AddHostedService<TelegramBotService>();
+            services.AddSingleton<ITelegramBotClient>(sp =>
+            {
+                var settings = sp.GetRequiredService<IOptions<TelegramBotSettings>>().Value;
+                return new TelegramBotClient(settings.BotToken);
+            });
+            services.AddHostedService<TelegramBotService>();
+        }
 
         return services;
     }
