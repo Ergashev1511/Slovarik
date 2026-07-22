@@ -2,7 +2,7 @@ services:
   - type: web
     name: slovarik-api
     runtime: docker
-    dockerfilePath: ./Slovarik.Api/Dockerfile
+    dockerfilePath: ./Dockerfile
     dockerContext: .
     plan: free
     healthCheckPath: /swagger
