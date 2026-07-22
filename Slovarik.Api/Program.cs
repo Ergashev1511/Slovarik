@@ -21,7 +21,6 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseCors();
-app.UseHttpsRedirection();
 
 app.MapUserEndpoints();
 app.MapWordEndpoints();

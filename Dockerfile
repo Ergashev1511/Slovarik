@@ -17,9 +17,6 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 COPY --from=build /app/publish .
 
-ENV ASPNETCORE_URLS=http://+:$PORT
 ENV ASPNETCORE_ENVIRONMENT=Production
 
-EXPOSE $PORT
-
-ENTRYPOINT ["dotnet", "Slovarik.Api.dll"]
+ENTRYPOINT ["sh", "-c", "ASPNETCORE_URLS=http://+:${PORT:-80} dotnet Slovarik.Api.dll"]
