@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: slovarik-api
+    runtime: docker
+    dockerfilePath: ./Slovarik.Api/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /swagger
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ConnectionStrings__DefaultConnection
+        sync: false
+      - key: Telegram__BotToken
+        sync: false
+      - key: Telegram__MiniAppUrl
+        value: https://slovarik-ui.onrender.com
+      - key: OpenAI__ApiKey
+        sync: false
+      - key: OpenAI__Model
+        value: google/gemma-4-26b-a4b-it:free
+      - key: OpenAI__BaseUrl
+        value: https://openrouter.ai/api/v1
+      - key: Quiz__SharedSalt
+        sync: false
