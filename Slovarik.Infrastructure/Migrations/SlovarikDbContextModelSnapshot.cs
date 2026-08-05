@@ -22,6 +22,31 @@ namespace Slovarik.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Slovarik.Domain.Entities.Category", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("categories", (string)null);
+                });
+
             modelBuilder.Entity("Slovarik.Domain.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -60,6 +85,9 @@ namespace Slovarik.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("CategoryId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -78,15 +106,17 @@ namespace Slovarik.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CategoryId");
+
                     b.HasIndex("UserId");
 
                     b.ToTable("words", (string)null);
                 });
 
-            modelBuilder.Entity("Slovarik.Domain.Entities.Word", b =>
+            modelBuilder.Entity("Slovarik.Domain.Entities.Category", b =>
                 {
                     b.HasOne("Slovarik.Domain.Entities.User", "User")
-                        .WithMany("Words")
+                        .WithMany("Categories")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -94,8 +124,33 @@ namespace Slovarik.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Slovarik.Domain.Entities.Word", b =>
+                {
+                    b.HasOne("Slovarik.Domain.Entities.Category", "Category")
+                        .WithMany("Words")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Slovarik.Domain.Entities.User", "User")
+                        .WithMany("Words")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Category");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Slovarik.Domain.Entities.Category", b =>
+                {
+                    b.Navigation("Words");
+                });
+
             modelBuilder.Entity("Slovarik.Domain.Entities.User", b =>
                 {
+                    b.Navigation("Categories");
+
                     b.Navigation("Words");
                 });
 #pragma warning restore 612, 618

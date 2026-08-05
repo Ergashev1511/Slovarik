@@ -6,8 +6,8 @@ using Slovarik.Application.Interfaces;
 using Slovarik.Application.Services;
 using Slovarik.Application.Settings;
 using Slovarik.Domain.Interfaces;
-using Slovarik.Infrastructure.Data;
 using Slovarik.Infrastructure.Repositories;
+using Slovarik.Infrastructure.Data;
 using Slovarik.Infrastructure.Services;
 using Slovarik.Infrastructure.Settings;
 using Slovarik.Infrastructure.Telegram;
@@ -26,11 +26,13 @@ public static class ServiceCollectionExtensions
         // Repositories
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IWordRepository, WordRepository>();
+        services.AddScoped<ICategoryRepository, CategoryRepository>();
 
         // Application services
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IWordService, WordService>();
         services.AddScoped<IQuizService, QuizService>();
+        services.AddScoped<ICategoryService, CategoryService>();
 
         // AI Service
         services.Configure<OpenAISettings>(config.GetSection("OpenAI"));

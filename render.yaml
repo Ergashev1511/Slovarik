@@ -18,7 +18,7 @@ services:
       - key: OpenAI__ApiKey
         sync: false
       - key: OpenAI__Model
-        value: google/gemma-4-26b-a4b-it:free
+        value: nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
       - key: OpenAI__BaseUrl
         value: https://openrouter.ai/api/v1
       - key: Quiz__SharedSalt

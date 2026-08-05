@@ -24,9 +24,12 @@ public class QuizService : IQuizService
         int questionCount,
         QuizDirection direction,
         bool selectFromEnd,
+        Guid? categoryId,
         CancellationToken ct = default)
     {
-        var words = await _wordRepository.GetByUserIdAsync(userId, ct);
+        var words = categoryId is null
+            ? await _wordRepository.GetByUserIdAsync(userId, ct)
+            : await _wordRepository.GetByUserIdAndCategoryAsync(userId, categoryId.Value, ct);
 
         if (words.Count < 4)
             throw new InvalidOperationException("Quiz boshlash uchun kamida 4 ta so'z kerak.");

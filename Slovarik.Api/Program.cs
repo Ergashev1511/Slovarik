@@ -1,5 +1,8 @@
+using Microsoft.EntityFrameworkCore;
 using Slovarik.Api.Endpoints;
+using Slovarik.Infrastructure.Data;
 using Slovarik.Infrastructure.Extensions;
+using Slovarik.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
@@ -33,5 +36,14 @@ app.UseCors();
 app.MapUserEndpoints();
 app.MapWordEndpoints();
 app.MapQuizEndpoints();
+app.MapCategoryEndpoints();
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<SlovarikDbContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    await db.Database.MigrateAsync();
+    await CategorySeeder.SeedAsync(db, logger);
+}
 
 app.Run();

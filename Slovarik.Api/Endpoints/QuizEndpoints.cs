@@ -13,7 +13,7 @@ public static class QuizEndpoints
         {
             try
             {
-                var response = await quizService.StartQuizAsync(request.UserId, request.QuestionCount, request.Direction, request.SelectFromEnd, ct);
+                var response = await quizService.StartQuizAsync(request.UserId, request.QuestionCount, request.Direction, request.SelectFromEnd, request.CategoryId, ct);
                 return Results.Ok(response);
             }
             catch (InvalidOperationException ex)

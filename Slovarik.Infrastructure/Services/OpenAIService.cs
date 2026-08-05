@@ -17,26 +17,12 @@ public class OpenAIService : IAIService
     private readonly ILogger<OpenAIService> _logger;
 
     private const string SystemPrompt =
-        "You are an expert Uzbek-Russian dictionary parser.\n" +
-        "Your task: read the provided text (it may be raw OCR output, a dictionary page, or a word list)\n" +
-        "and extract EVERY Uzbek-Russian word pair you can find.\n\n" +
-        "Common dictionary formats you will encounter:\n" +
-        "  - \"kitob - книга\"  (separated by a dash)\n" +
-        "  - \"kitob\tкнига\"   (separated by a tab or multiple spaces)\n" +
-        "  - \"kitob книга\"    (separated by a single space, Uzbek first)\n" +
-        "  - One pair per line, or multiple pairs on the same line.\n" +
-        "  - Sometimes the Russian side may contain multiple translations: \"kitob - книга, том\" —\n" +
-        "    in that case keep only the primary/first translation as wordRu.\n\n" +
-        "Rules:\n" +
-        "  1. wordUz = the Uzbek word (Latin or Cyrillic script).\n" +
-        "  2. wordRu = the Russian translation (Cyrillic).\n" +
-        "  3. Skip page numbers, headers, footers, and any line that is not a word pair.\n" +
-        "  4. Trim whitespace. Remove trailing punctuation from both fields.\n" +
-        "  5. If a word contains a parenthetical note like \"olma (daraxt)\", keep only \"olma\".\n" +
-        "  6. Do NOT invent pairs — only extract what is actually in the text.\n\n" +
-        "Output format — return ONLY a valid JSON object, no markdown, no code fences, no explanation:\n" +
-        "{\"words\":[{\"wordUz\":\"kitob\",\"wordRu\":\"книга\"},{\"wordUz\":\"olma\",\"wordRu\":\"яблоко\"}]}\n\n" +
-        "If no word pairs are found, return: {\"words\":[]}";
+        "You are a Uzbek-Russian dictionary OCR parser.\n" +
+        "Read the image/text and output word pairs as JSON.\n" +
+        "Format: {\"words\":[{\"wordUz\":\"kitob\",\"wordRu\":\"книга\",\"categoryName\":\"Boshqa so'zlar\"}]}\n" +
+        "Rules: wordUz=Uzbek, wordRu=Russian(Cyrillic), correct spelling, no extra text, no markdown, ONLY JSON.\n" +
+        "Assign each pair to a category from the list. If unsure, use \"Boshqa so'zlar\".\n" +
+        "Skip non-word lines (page numbers, headers).";
 
     public OpenAIService(
         HttpClient httpClient,
@@ -54,14 +40,19 @@ public class OpenAIService : IAIService
     public async Task<List<WordPairDto>> ExtractWordsFromImageAsync(
         byte[] imageBytes,
         string contentType,
+        IReadOnlyList<string> categoryNames,
         CancellationToken ct = default)
     {
         var base64 = Convert.ToBase64String(imageBytes);
         var dataUrl = $"data:{contentType};base64,{base64}";
 
+        var userPrompt = BuildUserPrompt(categoryNames);
+
         var requestBody = new
         {
             model = _settings.Model,
+            max_tokens = 16384,
+            reasoning = new { enabled = false },
             messages = new object[]
             {
                 new { role = "system", content = SystemPrompt },
@@ -70,7 +61,7 @@ public class OpenAIService : IAIService
                     role = "user",
                     content = new object[]
                     {
-                        new { type = "text", text = "Extract all Uzbek-Russian word pairs from this image." },
+                        new { type = "text", text = userPrompt },
                         new { type = "image_url", image_url = new { url = dataUrl } }
                     }
                 }
@@ -80,7 +71,7 @@ public class OpenAIService : IAIService
         return await SendChatRequestAsync(requestBody, ct);
     }
 
-    public async Task<List<WordPairDto>> ExtractWordsFromPdfAsync(byte[] pdfBytes, CancellationToken ct = default)
+    public async Task<List<WordPairDto>> ExtractWordsFromPdfAsync(byte[] pdfBytes, IReadOnlyList<string> categoryNames, CancellationToken ct = default)
     {
         var text = ExtractTextFromPdf(pdfBytes);
 
@@ -90,13 +81,17 @@ public class OpenAIService : IAIService
             return new List<WordPairDto>();
         }
 
+        var userPrompt = BuildUserPrompt(categoryNames);
+
         var requestBody = new
         {
             model = _settings.Model,
+            max_tokens = 16384,
+            reasoning = new { enabled = false },
             messages = new object[]
             {
                 new { role = "system", content = SystemPrompt },
-                new { role = "user", content = $"Extract all Uzbek-Russian word pairs from the following text:\n\n{text}" }
+                new { role = "user", content = $"{userPrompt}\n\n{text}" }
             },
         };
 
@@ -137,6 +132,9 @@ public class OpenAIService : IAIService
             // Model javobini markdown code fencedan tozalash
             messageContent = StripCodeFences(messageContent);
 
+            // Reasoning taglardan va boshqa matndan JSON'ni ajratib olish
+            messageContent = ExtractJsonFromContent(messageContent);
+
             using var contentDoc = JsonDocument.Parse(messageContent);
             var wordsArray = contentDoc.RootElement.GetProperty("words");
 
@@ -148,7 +146,10 @@ public class OpenAIService : IAIService
 
                 if (!string.IsNullOrWhiteSpace(wordUz) && !string.IsNullOrWhiteSpace(wordRu))
                 {
-                    result.Add(new WordPairDto(wordUz.Trim(), wordRu.Trim()));
+                    var categoryName = item.TryGetProperty("categoryName", out var catEl)
+                        ? catEl.GetString()
+                        : null;
+                    result.Add(new WordPairDto(wordUz.Trim(), wordRu.Trim(), categoryName?.Trim()));
                 }
             }
 
@@ -182,6 +183,50 @@ public class OpenAIService : IAIService
         }
 
         return trimmed;
+    }
+
+    private static string ExtractJsonFromContent(string content)
+    {
+        // <think>...</think> yoki <reasoning>...</reasoning> bloklarni olib tashlash
+        var thinkStart = content.IndexOf("<think>");
+        if (thinkStart >= 0)
+        {
+            var thinkEnd = content.IndexOf("</think>", thinkStart);
+            if (thinkEnd >= 0)
+                content = content.Remove(thinkStart, thinkEnd + "</think>".Length - thinkStart);
+        }
+
+        var reasoningStart = content.IndexOf("<reasoning>");
+        if (reasoningStart >= 0)
+        {
+            var reasoningEnd = content.IndexOf("</reasoning>", reasoningStart);
+            if (reasoningEnd >= 0)
+                content = content.Remove(reasoningStart, reasoningEnd + "</reasoning>".Length - reasoningStart);
+        }
+
+        content = content.Trim();
+
+        // Agar to'g'ridan JSON bo'lsa, qaytaramiz
+        if (content.StartsWith("{"))
+            return content;
+
+        // Aks holda, birinchi { dan oxirgi } gacha bo'lgan qismini olamiz
+        var firstBrace = content.IndexOf('{');
+        var lastBrace = content.LastIndexOf('}');
+
+        if (firstBrace >= 0 && lastBrace > firstBrace)
+            return content.Substring(firstBrace, lastBrace - firstBrace + 1);
+
+        return content;
+    }
+
+    private static string BuildUserPrompt(IReadOnlyList<string> categoryNames)
+    {
+        var categories = categoryNames.Count > 0
+            ? string.Join(", ", categoryNames.Select(c => $"\"{c}\""))
+            : "\"Boshqa so'zlar\"";
+
+        return $"Categories: {categories}. Output ONLY JSON, no explanation.";
     }
 
     private static string ExtractTextFromPdf(byte[] pdfBytes)
