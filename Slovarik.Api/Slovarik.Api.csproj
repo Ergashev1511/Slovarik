@@ -20,4 +20,11 @@
       <ProjectReference Include="..\Slovarik.Infrastructure\Slovarik.Infrastructure.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Content Include="..\seed-categories.txt">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        <Link>seed-categories.txt</Link>
+      </Content>
+    </ItemGroup>
+
 </Project>

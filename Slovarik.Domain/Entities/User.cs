@@ -10,4 +10,5 @@ public class User
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public ICollection<Word> Words { get; set; } = new List<Word>();
+    public ICollection<Category> Categories { get; set; } = new List<Category>();
 }

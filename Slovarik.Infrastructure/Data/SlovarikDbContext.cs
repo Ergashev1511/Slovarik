@@ -11,6 +11,7 @@ public class SlovarikDbContext : DbContext
 
     public DbSet<User> Users => Set<User>();
     public DbSet<Word> Words => Set<Word>();
+    public DbSet<Category> Categories => Set<Category>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -35,6 +36,22 @@ public class SlovarikDbContext : DbContext
                 .WithMany(u => u.Words)
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Category)
+                .WithMany(c => c.Words)
+                .HasForeignKey(e => e.CategoryId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<Category>(entity =>
+        {
+            entity.ToTable("categories");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
+            entity.HasOne(e => e.User)
+                .WithMany(u => u.Categories)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(e => new { e.UserId, e.Name }).IsUnique();
         });
     }
 }

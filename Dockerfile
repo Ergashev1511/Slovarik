@@ -10,6 +10,8 @@ RUN dotnet restore Slovarik.Api/Slovarik.Api.csproj
 
 COPY . .
 
+COPY seed-categories.txt Slovarik.Api/
+
 WORKDIR /src/Slovarik.Api
 RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false
 

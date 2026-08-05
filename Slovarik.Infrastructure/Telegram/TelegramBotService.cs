@@ -34,10 +34,25 @@ public class TelegramBotService : BackgroundService
         var me = await _botClient.GetMe(stoppingToken);
         _logger.LogInformation("Telegram bot ishga tushdi: @{Username}", me.Username);
 
-        await _botClient.ReceiveAsync(
-            updateHandler: HandleUpdateAsync,
-            errorHandler: HandleErrorAsync,
-            cancellationToken: stoppingToken);
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                await _botClient.ReceiveAsync(
+                    updateHandler: HandleUpdateAsync,
+                    errorHandler: HandleErrorAsync,
+                    cancellationToken: stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Telegram bot xatosi, 5 soniyadan keyin qayta uriniladi...");
+                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+            }
+        }
     }
 
     private async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken ct)

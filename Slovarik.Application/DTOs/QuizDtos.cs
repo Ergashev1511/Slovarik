@@ -15,6 +15,7 @@ public class QuizStartRequestDto
     public int QuestionCount { get; set; }
     public QuizDirection Direction { get; set; } = QuizDirection.UzToRu;
     public bool SelectFromEnd { get; set; } = false;
+    public Guid? CategoryId { get; set; }
 }
 
 public record QuizStartResponseDto(

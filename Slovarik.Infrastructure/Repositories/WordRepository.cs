@@ -17,7 +17,17 @@ public class WordRepository : IWordRepository
     public async Task<List<Word>> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
     {
         return await _context.Words
+            .Include(w => w.Category)
             .Where(w => w.UserId == userId)
+            .OrderByDescending(w => w.CreatedAt)
+            .ToListAsync(ct);
+    }
+
+    public async Task<List<Word>> GetByUserIdAndCategoryAsync(Guid userId, Guid categoryId, CancellationToken ct = default)
+    {
+        return await _context.Words
+            .Include(w => w.Category)
+            .Where(w => w.UserId == userId && w.CategoryId == categoryId)
             .OrderByDescending(w => w.CreatedAt)
             .ToListAsync(ct);
     }
