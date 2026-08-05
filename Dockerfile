@@ -20,5 +20,6 @@ WORKDIR /app
 COPY --from=build /app/publish .
 
 ENV ASPNETCORE_ENVIRONMENT=Production
+ENV DOTNET_USE_POLLING_FILE_WATCHER=1
 
 ENTRYPOINT ["sh", "-c", "ASPNETCORE_URLS=http://+:${PORT:-80} dotnet Slovarik.Api.dll"]
