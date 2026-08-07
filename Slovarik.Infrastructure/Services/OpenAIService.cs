@@ -17,12 +17,21 @@ public class OpenAIService : IAIService
     private readonly ILogger<OpenAIService> _logger;
 
     private const string SystemPrompt =
-        "You are a Uzbek-Russian dictionary OCR parser.\n" +
-        "Read the image/text and output word pairs as JSON.\n" +
-        "Format: {\"words\":[{\"wordUz\":\"kitob\",\"wordRu\":\"книга\",\"categoryName\":\"Boshqa so'zlar\"}]}\n" +
-        "Rules: wordUz=Uzbek, wordRu=Russian(Cyrillic), correct spelling, no extra text, no markdown, ONLY JSON.\n" +
-        "Assign each pair to a category from the list. If unsure, use \"Boshqa so'zlar\".\n" +
-        "Skip non-word lines (page numbers, headers).";
+        "You are a highly accurate Uzbek-Russian dictionary OCR parser.\n" +
+        "Your task: carefully analyze the image and extract every Uzbek-Russian word pair.\n" +
+        "\n" +
+        "Output format (ONLY JSON, no markdown, no explanation):\n" +
+        "{\"words\":[{\"wordUz\":\"kitob\",\"wordRu\":\"книга\"}]}\n" +
+        "\n" +
+        "Rules:\n" +
+        "1. wordUz = the Uzbek word (Latin script as shown in the image).\n" +
+        "2. wordRu = the Russian translation (Cyrillic script as shown in the image).\n" +
+        "3. Transcribe EXACTLY what is written — do not correct, rephrase, or add anything.\n" +
+        "4. Do NOT include page numbers, line numbers, headers, footers, or any non-word text.\n" +
+        "5. Do NOT invent or guess words that are not visible in the image.\n" +
+        "6. If a word is unclear or partially visible, skip it entirely.\n" +
+        "7. Each wordUz must have a matching wordRu. Do not output one without the other.\n" +
+        "8. No extra fields, no numbering, no commentary — ONLY the JSON above.";
 
     public OpenAIService(
         HttpClient httpClient,
@@ -40,13 +49,12 @@ public class OpenAIService : IAIService
     public async Task<List<WordPairDto>> ExtractWordsFromImageAsync(
         byte[] imageBytes,
         string contentType,
-        IReadOnlyList<string> categoryNames,
         CancellationToken ct = default)
     {
         var base64 = Convert.ToBase64String(imageBytes);
         var dataUrl = $"data:{contentType};base64,{base64}";
 
-        var userPrompt = BuildUserPrompt(categoryNames);
+        var userPrompt = BuildUserPrompt();
 
         var requestBody = new
         {
@@ -71,7 +79,7 @@ public class OpenAIService : IAIService
         return await SendChatRequestAsync(requestBody, ct);
     }
 
-    public async Task<List<WordPairDto>> ExtractWordsFromPdfAsync(byte[] pdfBytes, IReadOnlyList<string> categoryNames, CancellationToken ct = default)
+    public async Task<List<WordPairDto>> ExtractWordsFromPdfAsync(byte[] pdfBytes, CancellationToken ct = default)
     {
         var text = ExtractTextFromPdf(pdfBytes);
 
@@ -81,7 +89,7 @@ public class OpenAIService : IAIService
             return new List<WordPairDto>();
         }
 
-        var userPrompt = BuildUserPrompt(categoryNames);
+        var userPrompt = BuildUserPrompt();
 
         var requestBody = new
         {
@@ -146,10 +154,7 @@ public class OpenAIService : IAIService
 
                 if (!string.IsNullOrWhiteSpace(wordUz) && !string.IsNullOrWhiteSpace(wordRu))
                 {
-                    var categoryName = item.TryGetProperty("categoryName", out var catEl)
-                        ? catEl.GetString()
-                        : null;
-                    result.Add(new WordPairDto(wordUz.Trim(), wordRu.Trim(), categoryName?.Trim()));
+                    result.Add(new WordPairDto(wordUz.Trim(), wordRu.Trim()));
                 }
             }
 
@@ -220,13 +225,10 @@ public class OpenAIService : IAIService
         return content;
     }
 
-    private static string BuildUserPrompt(IReadOnlyList<string> categoryNames)
+    private static string BuildUserPrompt()
     {
-        var categories = categoryNames.Count > 0
-            ? string.Join(", ", categoryNames.Select(c => $"\"{c}\""))
-            : "\"Boshqa so'zlar\"";
-
-        return $"Categories: {categories}. Output ONLY JSON, no explanation.";
+        return "Carefully examine the image. Extract every visible Uzbek-Russian word pair exactly as written. " +
+               "Output ONLY valid JSON in the specified format. No markdown, no numbering, no extra text.";
     }
 
     private static string ExtractTextFromPdf(byte[] pdfBytes)

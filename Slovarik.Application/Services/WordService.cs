@@ -8,13 +8,11 @@ namespace Slovarik.Application.Services;
 public class WordService : IWordService
 {
     private readonly IWordRepository _wordRepository;
-    private readonly ICategoryRepository _categoryRepository;
     private readonly IAIService _aiService;
 
-    public WordService(IWordRepository wordRepository, ICategoryRepository categoryRepository, IAIService aiService)
+    public WordService(IWordRepository wordRepository, IAIService aiService)
     {
         _wordRepository = wordRepository;
-        _categoryRepository = categoryRepository;
         _aiService = aiService;
     }
 
@@ -26,23 +24,21 @@ public class WordService : IWordService
 
     public async Task<UploadResultDto> UploadAndProcessAsync(
         Guid userId,
+        Guid? categoryId,
         byte[] fileBytes,
         string contentType,
         string fileName,
         CancellationToken ct = default)
     {
-        var categories = await _categoryRepository.GetByUserIdAsync(userId, ct);
-        var categoryNames = categories.Select(c => c.Name).ToList().AsReadOnly();
-
         List<WordPairDto> pairs;
 
         if (contentType.StartsWith("image/"))
         {
-            pairs = await _aiService.ExtractWordsFromImageAsync(fileBytes, contentType, categoryNames, ct);
+            pairs = await _aiService.ExtractWordsFromImageAsync(fileBytes, contentType, ct);
         }
         else if (contentType is "application/pdf" || fileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
         {
-            pairs = await _aiService.ExtractWordsFromPdfAsync(fileBytes, categoryNames, ct);
+            pairs = await _aiService.ExtractWordsFromPdfAsync(fileBytes, ct);
         }
         else
         {
@@ -54,29 +50,19 @@ public class WordService : IWordService
             return new UploadResultDto(false, "So'zlar topilmadi.", new List<WordPairDto>());
         }
 
-        var categoryByName = categories.ToDictionary(c => c.Name, c => c.Id, StringComparer.OrdinalIgnoreCase);
-
         var words = pairs.Select(p => new Word
         {
             Id = Guid.NewGuid(),
             UserId = userId,
             WordUz = p.WordUz,
             WordRu = p.WordRu,
-            CategoryId = ResolveCategoryId(p.CategoryName, categoryByName)
+            CategoryId = categoryId
         }).ToList();
 
         await _wordRepository.AddRangeAsync(words, ct);
         await _wordRepository.SaveChangesAsync(ct);
 
         return new UploadResultDto(true, $"{pairs.Count} ta so'z saqlandi.", pairs);
-    }
-
-    private static Guid? ResolveCategoryId(string? categoryName, Dictionary<string, Guid> categoryByName)
-    {
-        if (string.IsNullOrWhiteSpace(categoryName))
-            return null;
-
-        return categoryByName.TryGetValue(categoryName, out var id) ? id : null;
     }
 
     private static WordDto MapToDto(Word word)
