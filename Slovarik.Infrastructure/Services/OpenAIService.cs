@@ -128,8 +128,8 @@ public class OpenAIService : IAIService
         try
         {
             using var doc = JsonDocument.Parse(responseJson);
-            var messageContent = doc.RootElement
-                .GetProperty("choices")[0]
+            var choice = doc.RootElement.GetProperty("choices")[0];
+            var messageContent = choice
                 .GetProperty("message")
                 .GetProperty("content")
                 .GetString();
@@ -137,11 +137,21 @@ public class OpenAIService : IAIService
             if (string.IsNullOrWhiteSpace(messageContent))
                 return new List<WordPairDto>();
 
+            if (choice.TryGetProperty("finish_reason", out var finishReasonEl))
+            {
+                var finishReason = finishReasonEl.GetString();
+                if (finishReason == "length")
+                    _logger.LogWarning("OpenAI javobi max_tokens chegarasida kesildi (finish_reason=length).");
+            }
+
             // Model javobini markdown code fencedan tozalash
             messageContent = StripCodeFences(messageContent);
 
             // Reasoning taglardan va boshqa matndan JSON'ni ajratib olish
             messageContent = ExtractJsonFromContent(messageContent);
+
+            // Truncated JSON ni repair qilishga urinish
+            messageContent = TryRepairJson(messageContent);
 
             using var contentDoc = JsonDocument.Parse(messageContent);
             var wordsArray = contentDoc.RootElement.GetProperty("words");
@@ -165,6 +175,58 @@ public class OpenAIService : IAIService
             _logger.LogError(ex, "OpenAI javobini parse qilishda xatolik.");
             return new List<WordPairDto>();
         }
+    }
+
+    private static string TryRepairJson(string json)
+    {
+        var sb = new StringBuilder(json);
+
+        // Hisoblab ochiq qavslar va qavs lar sonini topamiz
+        var openBraces = 0;
+        var openBrackets = 0;
+        var inString = false;
+        var escape = false;
+
+        foreach (var ch in json)
+        {
+            if (escape)
+            {
+                escape = false;
+                continue;
+            }
+
+            if (ch == '\\')
+            {
+                escape = true;
+                continue;
+            }
+
+            if (ch == '"')
+            {
+                inString = !inString;
+                continue;
+            }
+
+            if (inString)
+                continue;
+
+            if (ch == '{') openBraces++;
+            else if (ch == '}') openBraces--;
+            else if (ch == '[') openBrackets++;
+            else if (ch == ']') openBrackets--;
+        }
+
+        // Agar string ochiq bo'lsa, yopamiz
+        if (inString)
+            sb.Append('"');
+
+        // Ochiq qavslarni yopamiz
+        for (var i = 0; i < openBrackets; i++)
+            sb.Append(']');
+        for (var i = 0; i < openBraces; i++)
+            sb.Append('}');
+
+        return sb.ToString();
     }
 
     private static string StripCodeFences(string text)

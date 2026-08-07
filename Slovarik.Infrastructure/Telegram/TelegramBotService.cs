@@ -38,6 +38,7 @@ public class TelegramBotService : BackgroundService
         {
             try
             {
+                await _botClient.DeleteWebhook(dropPendingUpdates: true, cancellationToken: stoppingToken);
                 await _botClient.ReceiveAsync(
                     updateHandler: HandleUpdateAsync,
                     errorHandler: HandleErrorAsync,
@@ -49,8 +50,8 @@ public class TelegramBotService : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Telegram bot xatosi, 5 soniyadan keyin qayta uriniladi...");
-                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+                _logger.LogError(ex, "Telegram bot xatosi, 10 soniyadan keyin qayta uriniladi...");
+                await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
             }
         }
     }
