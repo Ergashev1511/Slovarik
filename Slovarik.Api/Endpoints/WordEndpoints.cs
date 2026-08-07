@@ -29,6 +29,11 @@ public static class WordEndpoints
             if (!Guid.TryParse(userIdStr, out var userId))
                 return Results.BadRequest(new ErrorResponseDto("Noto'g'ri userId."));
 
+            Guid? categoryId = null;
+            var categoryIdStr = form["categoryId"].ToString();
+            if (!string.IsNullOrWhiteSpace(categoryIdStr) && Guid.TryParse(categoryIdStr, out var parsedCategoryId))
+                categoryId = parsedCategoryId;
+
             var file = form.Files.FirstOrDefault();
             if (file is null || file.Length == 0)
                 return Results.BadRequest(new ErrorResponseDto("Fayl kerak."));
@@ -40,7 +45,7 @@ public static class WordEndpoints
             await file.CopyToAsync(ms, ct);
             var fileBytes = ms.ToArray();
 
-            var result = await wordService.UploadAndProcessAsync(userId, fileBytes, file.ContentType, file.FileName, ct);
+            var result = await wordService.UploadAndProcessAsync(userId, categoryId, fileBytes, file.ContentType, file.FileName, ct);
             return Results.Ok(result);
         })
         .WithName("UploadWords")
