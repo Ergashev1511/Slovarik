@@ -22,48 +22,77 @@ public class WordService : IWordService
         return words.Select(MapToDto).ToList();
     }
 
-    public async Task<UploadResultDto> UploadAndProcessAsync(
-        Guid userId,
-        Guid? categoryId,
-        byte[] fileBytes,
-        string contentType,
-        string fileName,
-        CancellationToken ct = default)
+    public async Task<BatchInsertResultDto> BatchInsertAsync(BatchInsertRequestDto request, CancellationToken ct = default)
     {
-        List<WordPairDto> pairs;
+        if (request.Words == null || request.Words.Count == 0)
+            return new BatchInsertResultDto(false, "So'zlar ro'yxati bo'sh.", 0);
 
-        if (contentType.StartsWith("image/"))
-        {
-            pairs = await _aiService.ExtractWordsFromImageAsync(fileBytes, contentType, ct);
-        }
-        else if (contentType is "application/pdf" || fileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
-        {
-            pairs = await _aiService.ExtractWordsFromPdfAsync(fileBytes, ct);
-        }
-        else
-        {
-            return new UploadResultDto(false, "Faqat rasm yoki PDF fayl yuklash mumkin.", new List<WordPairDto>());
-        }
+        var valid = request.Words
+            .Where(w => !string.IsNullOrWhiteSpace(w.WordUz) && !string.IsNullOrWhiteSpace(w.WordRu))
+            .ToList();
 
-        if (pairs.Count == 0)
-        {
-            return new UploadResultDto(false, "So'zlar topilmadi.", new List<WordPairDto>());
-        }
+        if (valid.Count == 0)
+            return new BatchInsertResultDto(false, "Yaroqli so'z juftliklari topilmadi.", 0);
 
-        var words = pairs.Select(p => new Word
+        var words = valid.Select(w => new Word
         {
             Id = Guid.NewGuid(),
-            UserId = userId,
-            WordUz = p.WordUz,
-            WordRu = p.WordRu,
-            CategoryId = categoryId
+            UserId = request.UserId,
+            WordUz = w.WordUz.Trim(),
+            WordRu = w.WordRu.Trim(),
+            CategoryId = request.CategoryId
         }).ToList();
 
         await _wordRepository.AddRangeAsync(words, ct);
         await _wordRepository.SaveChangesAsync(ct);
 
-        return new UploadResultDto(true, $"{pairs.Count} ta so'z saqlandi.", pairs);
+        return new BatchInsertResultDto(true, $"{valid.Count} ta so'z saqlandi.", valid.Count);
     }
+
+    // ── Legacy: AI-based upload — kept for future reactivation ───────────────────────────────
+    // public async Task<UploadResultDto> UploadAndProcessAsync(
+    //     Guid userId,
+    //     Guid? categoryId,
+    //     byte[] fileBytes,
+    //     string contentType,
+    //     string fileName,
+    //     CancellationToken ct = default)
+    // {
+    //     List<WordPairDto> pairs;
+    //
+    //     if (contentType.StartsWith("image/"))
+    //     {
+    //         pairs = await _aiService.ExtractWordsFromImageAsync(fileBytes, contentType, ct);
+    //     }
+    //     else if (contentType is "application/pdf" || fileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+    //     {
+    //         pairs = await _aiService.ExtractWordsFromPdfAsync(fileBytes, ct);
+    //     }
+    //     else
+    //     {
+    //         return new UploadResultDto(false, "Faqat rasm yoki PDF fayl yuklash mumkin.", new List<WordPairDto>());
+    //     }
+    //
+    //     if (pairs.Count == 0)
+    //     {
+    //         return new UploadResultDto(false, "So'zlar topilmadi.", new List<WordPairDto>());
+    //     }
+    //
+    //     var words = pairs.Select(p => new Word
+    //     {
+    //         Id = Guid.NewGuid(),
+    //         UserId = userId,
+    //         WordUz = p.WordUz,
+    //         WordRu = p.WordRu,
+    //         CategoryId = categoryId
+    //     }).ToList();
+    //
+    //     await _wordRepository.AddRangeAsync(words, ct);
+    //     await _wordRepository.SaveChangesAsync(ct);
+    //
+    //     return new UploadResultDto(true, $"{pairs.Count} ta so'z saqlandi.", pairs);
+    // }
+    // ─────────────────────────────────────────────────────────────────────────────────────────
 
     private static WordDto MapToDto(Word word)
     {
