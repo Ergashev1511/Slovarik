@@ -153,14 +153,29 @@ public class OpenAIService : IAIService
             // Truncated JSON ni repair qilishga urinish
             messageContent = TryRepairJson(messageContent);
 
+            _logger.LogDebug("OpenAI content (cleaned): {Content}", messageContent);
+
             using var contentDoc = JsonDocument.Parse(messageContent);
-            var wordsArray = contentDoc.RootElement.GetProperty("words");
+
+            // Model ba'zan "words" o'rniga boshqa key ishlatishi mumkin
+            JsonElement wordsArray;
+            if (contentDoc.RootElement.TryGetProperty("words", out var wordsEl))
+                wordsArray = wordsEl;
+            else if (contentDoc.RootElement.TryGetProperty("pairs", out var pairsEl))
+                wordsArray = pairsEl;
+            else if (contentDoc.RootElement.TryGetProperty("data", out var dataEl))
+                wordsArray = dataEl;
+            else
+            {
+                _logger.LogWarning("OpenAI javobida 'words' key topilmadi. Content: {Content}", messageContent);
+                return new List<WordPairDto>();
+            }
 
             var result = new List<WordPairDto>();
             foreach (var item in wordsArray.EnumerateArray())
             {
-                var wordUz = item.GetProperty("wordUz").GetString() ?? "";
-                var wordRu = item.GetProperty("wordRu").GetString() ?? "";
+                var wordUz = item.TryGetProperty("wordUz", out var uzEl) ? uzEl.GetString() ?? "" : "";
+                var wordRu = item.TryGetProperty("wordRu", out var ruEl) ? ruEl.GetString() ?? "" : "";
 
                 if (!string.IsNullOrWhiteSpace(wordUz) && !string.IsNullOrWhiteSpace(wordRu))
                 {
